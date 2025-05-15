@@ -1,0 +1,47 @@
+version: 2.2                    # Parser version
+
+pipelines:                      # A list of pipeline configurations
+  - id: pipeline1               # Pipeline ID [required]
+    status: running             # Pipeline status at startup (running or stopped)
+    name: weather-pipeline        # Pipeline name
+    description: weather pipeline           # Pipeline description
+    connectors:                 # A list of connector configurations
+      - id: weather-connector                # Connector ID [required]
+        type: source            # Connector type (source or destination) [required]
+        plugin: standalone:weather    # Connector plugin [required]
+        name: weather-connector    # Connector name
+        settings:
+           city: Atlanta
+           appid: 370520a46a9ab525bd4803f6ef0f8e6e
+           pollingPeriod: 5s
+           units: imperial
+      - id: postgres-destination
+        type: destination
+        plugin: standalone:postgres@v0.12.1-2-g1c36ab1-dirty
+        name: postgres-destination
+        settings:
+          url: postgresql://ptso_user:ptso_password@localhost:5432/ptso_db
+          table: weather_data
+          sdk.schema.extract.key.enabled: "false"
+        processors:
+          - id: extract-fields
+            plugin: custom.javascript
+            settings:
+              script: |
+                function process(record) {
+                  // Generate a random 7-digit number
+                  const randomId = Math.floor(1000000 + Math.random() * 9000000);
+                  record.key = {id: randomId};
+                  // Create a new record with only name and temp
+                  record.Payload.After = {
+                    name: record.Payload.After.name,
+                    temp: record.Payload.After.main.temp
+                  };
+                  return record;
+                }
+    dead-letter-queue:          # Dead-letter queue (DLQ) configuration
+      plugin: "builtin:file"    # DLQ Connector plugin
+      settings:                 # A map of configuration keys and values for the plugin (specific to the chosen plugin)
+        path: "./dlq-test.out"
+      window-size: 5            # DLQ nack window size
+      window-nack-threshold: 2  # DLQ nack window threshold
