@@ -1,0 +1,17 @@
+{
+    "capabilities": {},
+    "defaultInputModes": ["text/plain"],
+    "defaultOutputModes": ["application/json"],
+    "description": "An agent that uses MCP tools to fetch weather data from a PostgreSQL database.",
+    "name": "weather_agent",
+    "skills": [
+      {
+        "id": "weather_checking",
+        "name": "Weather Checking",
+        "description": "Check if weather data is available in the PostgreSQL database",
+        "tags": ["weather", "database", "postgresql"]
+      }
+    ],
+    "url": "http://localhost:8005/a2a/weather_agent",
+    "version": "1.0.0"
+  }

@@ -1,0 +1,17 @@
+{
+    "capabilities": {},
+    "defaultInputModes": ["text/plain"],
+    "defaultOutputModes": ["application/json"],
+    "description": "An agent that uses MCP tools to fetch wardrobe data from a PostgreSQL database.",
+    "name": "wardrobe_agent",
+    "skills": [
+      {
+        "id": "wardrobe_checking",
+        "name": "Wardrobe Checking",
+        "description": "Check if wardrobe data is available in the PostgreSQL database",
+        "tags": ["wardrobe", "database", "postgresql"]
+      }
+    ],
+    "url": "http://localhost:8005/a2a/wardrobe_agent",
+    "version": "1.0.0"
+  }

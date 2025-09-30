@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ptso_db
+      POSTGRES_USER: ptso_user
+      POSTGRES_PASSWORD: ptso_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ptso_user -d ptso_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ollama Local LLM Service (Optional)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    profiles:
+      - local-llm
+
+  # vLLM Local LLM Service (Optional)
+  vllm:
+    image: vllm/vllm-openai:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    command: ["--model", "meta-llama/Llama-3.1-8B-Instruct", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    profiles:
+      - local-llm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Weather Agent A2A Service
+  weather-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.weather
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgresql://ptso_user:ptso_password@postgres:5432/ptso_db
+      # LLM Configuration
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - VLLM_BASE_URL=${VLLM_BASE_URL:-http://vllm:8000}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./agent_instructions:/app/agent_instructions
+      - ./utils:/app/utils
+    restart: unless-stopped
+
+  # Wardrobe Agent A2A Service
+  wardrobe-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.wardrobe
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - DATABASE_URL=postgresql://ptso_user:ptso_password@postgres:5432/ptso_db
+      # LLM Configuration
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - VLLM_BASE_URL=${VLLM_BASE_URL:-http://vllm:8000}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./agent_instructions:/app/agent_instructions
+      - ./utils:/app/utils
+    restart: unless-stopped
+
+  # PTSO Agent A2A Client
+  ptso-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.ptso
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - WEATHER_AGENT_URL=http://weather-agent:8001
+      - WARDROBE_AGENT_URL=http://wardrobe-agent:8002
+      # LLM Configuration
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - VLLM_BASE_URL=${VLLM_BASE_URL:-http://vllm:8000}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+    depends_on:
+      - weather-agent
+      - wardrobe-agent
+    volumes:
+      - ./agent_instructions:/app/agent_instructions
+      - ./utils:/app/utils
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ollama_data:

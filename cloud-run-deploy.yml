@@ -1,0 +1,53 @@
+# Cloud Run deployment configuration for A2A agents
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: weather-agent-a2a
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containers:
+      - image: gcr.io/PROJECT_ID/weather-agent-a2a:latest
+        ports:
+        - containerPort: 8001
+        env:
+        - name: PORT
+          value: "8001"
+        - name: DATABASE_URL
+          value: "postgresql://ptso_user:ptso_password@localhost:5432/ptso_db"
+        resources:
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: wardrobe-agent-a2a
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containers:
+      - image: gcr.io/PROJECT_ID/wardrobe-agent-a2a:latest
+        ports:
+        - containerPort: 8002
+        env:
+        - name: PORT
+          value: "8002"
+        - name: DATABASE_URL
+          value: "postgresql://ptso_user:ptso_password@localhost:5432/ptso_db"
+        resources:
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+
