@@ -1,0 +1,91 @@
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ptso_db
+      POSTGRES_USER: ptso_user
+      POSTGRES_PASSWORD: ptso_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ptso_user -d ptso_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Weather Agent A2A Service
+  weather-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.weather
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgresql://ptso_user:ptso_password@postgres:5432/ptso_db
+      # LLM Configuration for local Ollama
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LLM_PROVIDER=ollama
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./agent_instructions:/app/agent_instructions
+      - ./utils:/app/utils
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Wardrobe Agent A2A Service
+  wardrobe-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.wardrobe
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - DATABASE_URL=postgresql://ptso_user:ptso_password@postgres:5432/ptso_db
+      # LLM Configuration for local Ollama
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LLM_PROVIDER=ollama
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./agent_instructions:/app/agent_instructions
+      - ./utils:/app/utils
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # PTSO Agent A2A Client
+  ptso-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.ptso
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - WEATHER_AGENT_URL=http://weather-agent:8001
+      - WARDROBE_AGENT_URL=http://wardrobe-agent:8002
+      # LLM Configuration for local Ollama
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LLM_PROVIDER=ollama
+    depends_on:
+      - weather-agent
+      - wardrobe-agent
+    volumes:
+      - ./agent_instructions:/app/agent_instructions
+      - ./utils:/app/utils
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
